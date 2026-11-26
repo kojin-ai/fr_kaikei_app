@@ -167,6 +167,9 @@ with t2:
     order = c[4].selectbox("並び順", ["軸の順", "値が大きい順"])
     topn = c[5].number_input("上位N件(0=全て)", min_value=0, value=0)
 
+    if d2 == d1:
+        st.warning("「さらに分ける軸」は、分ける軸と別のものを選んでください。")
+        d2 = NONE
     keys = [d1] + ([d2] if d2 != NONE else [])
     gdf = D.groupby(keys).agg(収入=("収入", "sum"), 支出=("支出", "sum"), 件数=("日付", "size")).reset_index()
     gdf["収支"] = gdf["収入"] - gdf["支出"]
@@ -183,20 +186,21 @@ with t2:
         pv = pv.reindex([w + "曜" for w in WEEK if w + "曜" in pv.index])
     if topn:
         pv = pv.head(int(topn))
-    body = pv.drop(columns="合計") if d2 != NONE else pv[["合計"]].rename(columns={"合計": vcol})
+    body = pv.drop(columns="合計")
 
     left, right = st.columns([3, 2])
-    long = body.reset_index().melt(id_vars=d1, var_name="系列", value_name=vcol)
+    long = body.reset_index().melt(id_vars=d1, var_name="系列", value_name="値")
     if ctype in ("円", "ドーナツ"):
         fig = px.pie(pv.reset_index(), names=d1, values="合計", hole=0.45 if ctype == "ドーナツ" else 0)
     elif ctype == "ヒートマップ" and d2 != NONE:
         fig = px.imshow(body, aspect="auto", color_continuous_scale="Blues")
     elif ctype == "折れ線":
-        fig = px.line(long, x=d1, y=vcol, color="系列", markers=True)
+        fig = px.line(long, x=d1, y="値", color="系列", markers=True, labels={"値": mname})
     elif ctype == "横棒":
-        fig = px.bar(long, y=d1, x=vcol, color="系列", orientation="h", barmode="group")
+        fig = px.bar(long, y=d1, x="値", color="系列", orientation="h", barmode="group", labels={"値": mname})
     else:
-        fig = px.bar(long, x=d1, y=vcol, color="系列", barmode="relative" if ctype == "積み上げ棒" else "group")
+        fig = px.bar(long, x=d1, y="値", color="系列", labels={"値": mname},
+                     barmode="relative" if ctype == "積み上げ棒" else "group")
     fig.update_layout(showlegend=d2 != NONE or ctype in ("円", "ドーナツ"))
     left.plotly_chart(fig)
     right.dataframe(pv.style.format("{:,.0f}"))
@@ -248,3 +252,4 @@ with t3:
 # ---------- データ ----------
 with t4:
     st.dataframe(D.drop(columns=[]), hide_index=True)
+
